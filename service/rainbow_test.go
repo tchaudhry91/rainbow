@@ -8,7 +8,7 @@ import (
 
 // getServices creates a simple service to test against
 func getService() (svc service.RainbowService, err error) {
-	svc = service.NewSHA256RainbowService()
+	svc = service.NewSHA256RainbowService(service.NewInMemStore())
 	return
 }
 
@@ -31,9 +31,12 @@ func TestServiceHash(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		ReceivedHash := svc.Hash(testCase.Blob)
-		if testCase.WantedHash != ReceivedHash {
-			t.Errorf("Failed for blob - %s, Wanted: %s, Received: %s", testCase.Blob, testCase.WantedHash, ReceivedHash)
+		receivedHash, err := svc.Hash(testCase.Blob)
+		if err != nil {
+			t.Errorf("Failed to insert the blob %s because %v:", testCase.Blob, err)
+		}
+		if testCase.WantedHash != receivedHash {
+			t.Errorf("Failed for blob - %s, Wanted: %s, Received: %s", testCase.Blob, testCase.WantedHash, receivedHash)
 		}
 	}
 }
@@ -57,12 +60,17 @@ func TestServiceHashReverse(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		ReceivedBlob, err := svc.HashReverse(testCase.Hash)
+		// Put the key in the database first to ensure availability
+		_, err := svc.Hash(testCase.WantedBlob)
 		if err != nil {
-			t.Errorf("Failed to calculate reverse hash for %s", testCase.Hash)
+			t.Errorf("Failed to Hash :%s", err)
 		}
-		if testCase.WantedBlob != ReceivedBlob {
-			t.Errorf("Failed for Hash - %s, Wanted: %s, Received: %s", testCase.Hash, testCase.WantedBlob, ReceivedBlob)
+		receivedBlob, err := svc.HashReverse(testCase.Hash)
+		if err != nil {
+			t.Errorf("Failed to calculate reverse hash for %s: %v", testCase.Hash, err)
+		}
+		if testCase.WantedBlob != receivedBlob {
+			t.Errorf("Failed for Hash - %s, Wanted: %s, Received: %s", testCase.Hash, testCase.WantedBlob, receivedBlob)
 		}
 	}
 }
