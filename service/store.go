@@ -1,6 +1,11 @@
 package service
 
-import "fmt"
+import (
+	"context"
+	"fmt"
+
+	redis "github.com/go-redis/redis/v8"
+)
 
 // Store is an interface defining the operations required from a Rainbow Store
 type Store interface {
@@ -30,4 +35,31 @@ func (store *InMemStore) Get(hash string) (blob string, err error) {
 		return blob, nil
 	}
 	return "", fmt.Errorf("Not Found")
+}
+
+// RedisStore implements a rainbow store backed by redis
+type RedisStore struct {
+	client *redis.Client
+}
+
+// NewRedisStore instantiates a new redis-backed Rainbow store
+func NewRedisStore(addr string, password string, db int) *RedisStore {
+	client := redis.NewClient(&redis.Options{
+		Addr:     addr,
+		Password: password,
+		DB:       db,
+	})
+	return &RedisStore{
+		client: client,
+	}
+}
+
+// Put sets the blob as the value for the given hash key
+func (store *RedisStore) Put(blob string, hash string) error {
+	return store.client.Set(context.Background(), hash, blob, 0).Err()
+}
+
+// Get retrieves the value from the redis database. Errors if value is not found
+func (store *RedisStore) Get(hash string) (blob string, err error) {
+	return store.client.Get(context.Background(), hash).Result()
 }
